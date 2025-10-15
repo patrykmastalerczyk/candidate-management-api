@@ -1,84 +1,75 @@
 # Candidate Management API
 
-A NestJS application for managing candidates with PostgreSQL database and TypeORM.
-
-## Prerequisites
-
-- Docker and Docker Compose installed on your system
+NestJS API for managing candidates with PostgreSQL and TypeORM.
 
 ## Quick Start
 
-### Production Mode
-
+### 1. Start with Docker
 ```bash
-# Build and start all services
+# Production
 docker-compose up --build
 
+# Development (with hot reload)
+docker-compose -f docker-compose.dev.yml up --build
+```
+
+### 2. Seed Database
+```bash
 # Run in background
 docker-compose up -d --build
+
+# Seed initial data
+npm run seed
 ```
 
-### Development Mode
-
-```bash
-# Start development environment
-docker-compose -f docker-compose.dev.yml up --build
-
-# Run in background
-docker-compose -f docker-compose.dev.yml up -d --build
-```
-
-## Services
-
+### 3. Access Services
 - **API**: http://localhost:3000
-- **PostgreSQL**: localhost:5432
-  - Database: `candidate_management`
-  - Username: `postgres`
-  - Password: `postgres`
+- **Swagger**: http://localhost:3000/api
+- **Database**: localhost:5432
 
-## Development
+## Local Development
 
-### Local Development (without Docker)
-
-1. Install dependencies:
 ```bash
+# Install dependencies
 npm install
-```
 
-2. Start PostgreSQL (using Docker):
-```bash
+# Start only database
 docker-compose up postgres -d
-```
 
-3. Start the application:
-```bash
+# Start application
 npm run start:dev
+
+# Seed data
+npm run seed
 ```
 
-### Database Management
-
-- The database will be automatically created when you first run the application
-- TypeORM will synchronize the schema in development mode
-- Data persists in Docker volumes
-
-## Stopping Services
+## Testing
 
 ```bash
-# Stop all services
+# Unit tests
+npm test
+
+# E2E tests
+npm run test:e2e
+
+# All tests
+npm run test:all
+```
+
+## Database
+
+- **Database**: `candidate_management`
+- **Username**: `postgres`
+- **Password**: `postgres`
+- **Auto-created** on first run
+- **Seeded** with job offers
+
+## Stop Services
+
+```bash
+# Stop all
 docker-compose down
 
-# Stop and remove volumes (WARNING: This will delete all data)
+# Stop and remove data
 docker-compose down -v
 ```
-
-## Environment Variables
-
-The application uses the following environment variables:
-
-- `DATABASE_HOST`: Database host (default: localhost)
-- `DATABASE_PORT`: Database port (default: 5432)
-- `DATABASE_USERNAME`: Database username (default: postgres)
-- `DATABASE_PASSWORD`: Database password (default: postgres)
-- `DATABASE_NAME`: Database name (default: candidate_management)
-- `NODE_ENV`: Environment (development/production)
-- `PORT`: Application port (default: 3000)
