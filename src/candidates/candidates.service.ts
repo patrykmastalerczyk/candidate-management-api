@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Candidate } from '../entities/candidate.entity';
@@ -6,30 +6,26 @@ import { JobOffer } from '../entities/job-offer.entity';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { LegacyApiService } from '../legacy/legacy-api.service';
+import { CandidateResponse } from './interfaces/candidate-response.interface';
+import { APP_CONSTANTS, ERROR_MESSAGES } from '../constants/app.constants';
 
 @Injectable()
 export class CandidatesService {
+  private readonly logger = new Logger(CandidatesService.name);
+
   constructor(
     @InjectRepository(Candidate)
-    private candidateRepository: Repository<Candidate>,
+    private readonly candidateRepository: Repository<Candidate>,
     @InjectRepository(JobOffer)
-    private jobOfferRepository: Repository<JobOffer>,
-    private legacyApiService: LegacyApiService,
+    private readonly jobOfferRepository: Repository<JobOffer>,
+    private readonly legacyApiService: LegacyApiService,
   ) {}
 
   async create(createCandidateDto: CreateCandidateDto): Promise<Candidate> {
-    const jobOffers = await this.jobOfferRepository.findBy({
-      id: In(createCandidateDto.jobOfferIds),
-    });
+    this.logger.log(`Creating candidate: ${createCandidateDto.email}`);
     
-    if (jobOffers.length !== createCandidateDto.jobOfferIds.length) {
-      throw new BadRequestException('One or more job offers not found');
-    }
-
-    if (jobOffers.length === 0) {
-      throw new BadRequestException('At least one job offer is required');
-    }
-
+    const jobOffers = await this.validateJobOffers(createCandidateDto.jobOfferIds);
+    
     const candidate = this.candidateRepository.create({
       ...createCandidateDto,
       consentDate: new Date(createCandidateDto.consentDate),
@@ -40,7 +36,9 @@ export class CandidatesService {
 
     try {
       await this.legacyApiService.createCandidateInLegacySystem(createCandidateDto);
+      this.logger.log(`Candidate created successfully: ${savedCandidate.id}`);
     } catch (error) {
+      this.logger.error(`Legacy API failed, rolling back candidate: ${savedCandidate.id}`);
       await this.candidateRepository.remove(savedCandidate);
       throw error;
     }
@@ -48,8 +46,24 @@ export class CandidatesService {
     return savedCandidate;
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<{ candidates: Candidate[]; total: number; page: number; limit: number }> {
-    const { page = 1, limit = 10 } = paginationDto;
+  private async validateJobOffers(jobOfferIds: number[]): Promise<JobOffer[]> {
+    const jobOffers = await this.jobOfferRepository.findBy({
+      id: In(jobOfferIds),
+    });
+    
+    if (jobOffers.length !== jobOfferIds.length) {
+      throw new BadRequestException(ERROR_MESSAGES.JOB_OFFERS_NOT_FOUND);
+    }
+
+    if (jobOffers.length === 0) {
+      throw new BadRequestException(ERROR_MESSAGES.JOB_OFFERS_REQUIRED);
+    }
+
+    return jobOffers;
+  }
+
+  async findAll(paginationDto: PaginationDto): Promise<CandidateResponse> {
+    const { page = APP_CONSTANTS.DEFAULT_PAGE, limit = APP_CONSTANTS.DEFAULT_LIMIT } = paginationDto;
     const skip = (page - 1) * limit;
 
     const [candidates, total] = await this.candidateRepository.findAndCount({
@@ -58,6 +72,8 @@ export class CandidatesService {
       take: limit,
       order: { createdAt: 'DESC' },
     });
+
+    this.logger.log(`Retrieved ${candidates.length} candidates (page ${page}/${Math.ceil(total / limit)})`);
 
     return {
       candidates,
@@ -74,7 +90,7 @@ export class CandidatesService {
     });
 
     if (!candidate) {
-      throw new NotFoundException(`Candidate with ID ${id} not found`);
+      throw new NotFoundException(`${ERROR_MESSAGES.CANDIDATE_NOT_FOUND} with ID ${id}`);
     }
 
     return candidate;
@@ -87,7 +103,7 @@ export class CandidatesService {
     });
 
     if (!candidate) {
-      throw new NotFoundException(`Candidate with email ${email} not found`);
+      throw new NotFoundException(`${ERROR_MESSAGES.CANDIDATE_NOT_FOUND} with email ${email}`);
     }
 
     return candidate;

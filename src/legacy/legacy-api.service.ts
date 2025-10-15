@@ -13,7 +13,7 @@ export class LegacyApiService {
       
       this.logger.log(`Successfully created candidate in legacy system: ${candidateData.email}`);
     } catch (error) {
-      this.logger.error(`Failed to create candidate in legacy system: ${error.message}`);
+      this.logger.error(`Failed to create candidate in legacy system: ${error.message}`, error.stack);
       throw new Error(`Legacy API integration failed: ${error.message}`);
     }
   }
